@@ -19,5 +19,5 @@ def split_csv(file_path, prefix="new_csv", chunk_size=50000):
 
 path_name = 'csv/input_csvs/zouk_point.csv'
 prefix = 'zouk_point'
-chunk_size = 50000
+chunk_size = 10
 split_csv(path_name,prefix,chunk_size)
