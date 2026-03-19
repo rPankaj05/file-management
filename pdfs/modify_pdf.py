@@ -181,6 +181,10 @@ from pdfrw import PdfReader, PdfWriter, PageMerge
 import os
 from pathlib import Path
 
+INPUT_FOLDER = Path("pdfs/input_pdf")
+OUTPUT_FOLDER = Path("pdfs/output_pdf_modify_pdf")
+MARGIN_SIZE = 60
+
 def merge_pdf_vertically_with_margins(input_path, output_path, margin=60):
     """
     Merge two PDF pages vertically on A4 with margins
@@ -245,43 +249,33 @@ def merge_pdf_vertically_with_margins(input_path, output_path, margin=60):
     
     writer.write(output_path)
 
-def process_pdf_folder(input_folder, margin=60):
+def process_pdf_folder(input_folder, output_folder, margin=60):
     """
     Process all PDFs in input folder and save merged versions to automatically created output folder
     :param input_folder: Path to folder containing PDFs to process
     :param margin: Margin size in points
     :return: Path to the created output folder
     """
-    # Create output folder name
-    input_folder_name = os.path.basename(os.path.normpath(input_folder))
-    output_folder = f"{input_folder_name}_merged_out"
-    
-    # Create full output path (in same directory as input folder)
-    output_path = os.path.join(os.path.dirname(input_folder), output_folder)
-    
-    # Create output folder if it doesn't exist
-    Path(output_path).mkdir(parents=True, exist_ok=True)
+    output_path = Path(output_folder)
+    output_path.mkdir(parents=True, exist_ok=True)
     
     # Process each PDF in input folder
     processed_files = 0
     for filename in os.listdir(input_folder):
         if filename.lower().endswith('.pdf'):
             input_file = os.path.join(input_folder, filename)
-            output_file = os.path.join(output_path, f"{os.path.splitext(filename)[0]}_merged.pdf")
+            output_file = output_path / filename
             
             print(f"Processing: {filename}")
             try:
                 merge_pdf_vertically_with_margins(input_file, output_file, margin)
                 processed_files += 1
-                print(f"Created: {os.path.basename(output_file)}")
+                print(f"Created: {Path(output_file).name}")
             except Exception as e:
                 print(f"Error processing {filename}: {str(e)}")
     
     print(f"\nProcessing complete! {processed_files} PDFs created in: {output_path}")
     return output_path
 
-# Example usage:
-input_folder = "pdfs/input_pdf1"  # Replace with your folder path
-margin_size = 60  # Adjust margin size as needed
 
-output_folder = process_pdf_folder(input_folder, margin_size)
+output_folder = process_pdf_folder(INPUT_FOLDER, OUTPUT_FOLDER, MARGIN_SIZE)
