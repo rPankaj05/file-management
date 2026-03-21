@@ -16,6 +16,8 @@ WATERMARK_TEXTS = [
     "@freepdfhall",
     "@apna_pdf",
     "@apna_yct",
+    "CLICK HERE",
+    "CLICK"
 ]
 
 

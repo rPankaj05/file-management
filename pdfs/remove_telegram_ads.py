@@ -12,8 +12,8 @@ except ImportError:
 
 INPUT_FOLDER = Path("pdfs/input_pdf")
 OUTPUT_FOLDER = Path("pdfs/output_pdf_remove_telegram_ads")
-TOP_RATIO = 0.07
-BOTTOM_RATIO = 0.07
+TOP_RATIO = 0.00
+BOTTOM_RATIO = 0.08
 REMOVE_KEYWORDS = True
 
 KEYWORDS = [

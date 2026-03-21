@@ -12,7 +12,7 @@ except ImportError:
 
 INPUT_FOLDER = Path("pdfs/input_pdf")
 OUTPUT_FOLDER = Path("pdfs/output_pdf_remove_watermark")
-WATERMARK_TEXT = "@apna_pdf"
+WATERMARK_TEXT = "CLICK HERE JOIN DSSB TGT PGT LT BOOKS"
 
 
 def iter_pdf_files(folder: Path) -> list[Path]:
