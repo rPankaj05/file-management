@@ -12,18 +12,21 @@ except ImportError:
 
 INPUT_FOLDER = Path("pdfs/input_pdf")
 OUTPUT_FOLDER = Path("pdfs/output_pdf_remove_telegram_ads")
-TOP_RATIO = 0.00
-BOTTOM_RATIO = 0.08
+TOP_RATIO = 0.0
+BOTTOM_RATIO = 0.0
 REMOVE_KEYWORDS = True
+PADDING_X = 2
+PADDING_Y = 1
 
 KEYWORDS = [
-    "telegram",
-    "t.me",
-    "join telegram",
-    "telegram group",
-    "telegram channel",
-    "CLICK HERE",
-    "https://t.me/youthpublicationbook",
+    "CLICK HERE–PDFs Hub ( Free Book &TEST",
+    "CLICK HERE – PDFs Hub( Free Book &TEST",
+    "SERIES)",
+    "https://t.me/pdfhub2020",
+]
+
+LINK_URIS_TO_REMOVE = [
+    "https://t.me/pdfhub2020",
 ]
 
 
@@ -59,8 +62,30 @@ def add_keyword_redactions(page: fitz.Page, keywords: list[str]) -> int:
     matches = 0
     for keyword in keywords:
         for rect in page.search_for(keyword, quads=False):
-            page.add_redact_annot(rect, fill=(1, 1, 1))
+            padded_rect = fitz.Rect(
+                rect.x0 - PADDING_X,
+                rect.y0 - PADDING_Y,
+                rect.x1 + PADDING_X,
+                rect.y1 + PADDING_Y,
+            )
+            page.add_redact_annot(padded_rect, fill=(1, 1, 1))
             matches += 1
+    return matches
+
+
+def delete_matching_links(page: fitz.Page, target_uris: list[str]) -> int:
+    matches = 0
+    normalized_uris = [uri.strip().lower() for uri in target_uris if uri.strip()]
+
+    for link in page.get_links():
+        uri = (link.get("uri") or "").strip().lower()
+        if uri and any(target_uri in uri for target_uri in normalized_uris):
+            try:
+                page.delete_link(link)
+            except Exception:
+                pass
+            matches += 1
+
     return matches
 
 
@@ -78,6 +103,7 @@ def clean_pdf(
         add_band_redactions(page, top_ratio, bottom_ratio)
         if remove_keywords:
             keyword_hits += add_keyword_redactions(page, KEYWORDS)
+            keyword_hits += delete_matching_links(page, LINK_URIS_TO_REMOVE)
         page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_REMOVE)
 
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
