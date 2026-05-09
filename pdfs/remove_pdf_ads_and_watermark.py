@@ -20,6 +20,8 @@ TEXT_STRINGS_TO_REMOVE = [
     "CLICK HERE — UPSC/UPPCS Notes",
     "Made with Xodo PDF Reader and Editor",
     "REXODAS",
+    "Shubham Gupta Academy",
+    "8989851047 – Shubham Gupta Academy"
 ]
 
 # Put exact or partial link URIs here.
