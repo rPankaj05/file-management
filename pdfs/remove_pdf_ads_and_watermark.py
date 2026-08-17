@@ -10,11 +10,16 @@ except ImportError:
     sys.exit(1)
 
 
-INPUT_FOLDER = Path("pdfs/input_pdf")
+INPUT_FOLDERS = (Path("pdfs/input"), Path("pdfs/input_pdf"))
 OUTPUT_FOLDER = Path("pdfs/output_pdf_remove_pdf_ads_and_watermark")
 
 # Put every exact visible text string here that you want to remove.
 TEXT_STRINGS_TO_REMOVE = [
+    "CLICK HERE - JOIN @YCTBOOKS",
+    "@Yctbooks",
+    "FREE PDF Notes Click NOW",
+    "CLICK HERE — UPSC /UPPCS /BPSC  STUDY MATERIAL",
+    "Made with Xodo PDF Reader and Editor",
     "CLICK HERE - JOIN @APNAPDFS",
     "CLICK HERE — UPPCS NOTES 2026",
     "CLICK HERE — UPSC/UPPCS Notes",
@@ -26,6 +31,7 @@ TEXT_STRINGS_TO_REMOVE = [
 
 # Put exact or partial link URIs here.
 LINK_URIS_TO_REMOVE = [
+    "https://t.me/yctbooks",
     "https://t.me/pdfhub2021",
     "https://t.me/+e2JzB6EsQmo4YjU1",
     "https://play.google.com/store/apps/details?id=com.xodo.pdf.reader",
@@ -39,6 +45,13 @@ def iter_pdf_files(folder: Path) -> list[Path]:
     if not folder.is_dir():
         return []
     return sorted(path for path in folder.iterdir() if path.suffix.lower() == ".pdf")
+
+
+def find_input_folder() -> Path:
+    for folder in INPUT_FOLDERS:
+        if folder.is_dir():
+            return folder
+    return INPUT_FOLDERS[0]
 
 
 def build_output_path(input_pdf: Path) -> Path:
@@ -90,6 +103,83 @@ def delete_matching_links(page: fitz.Page, target_uris: list[str]) -> int:
     return matches
 
 
+def disable_watermark_patterns(doc: fitz.Document, watermark_texts: list[str]) -> int:
+    """Disable reusable Pattern/Form streams containing a watermark string.
+
+    The sample PDF places @Yctbooks in a tiling Pattern over the page image.
+    Removing that stream preserves the raster page underneath, including text
+    that the diagonal watermark crosses visually.
+    """
+    needles = [text.encode("latin1", errors="ignore").lower()
+               for text in watermark_texts if text.strip()]
+    disabled = 0
+
+    for xref in range(1, doc.xref_length()):
+        try:
+            stream = doc.xref_stream(xref)
+            object_text = doc.xref_object(xref, compressed=False)
+        except Exception:
+            continue
+
+        if not stream or not any(needle in stream.lower() for needle in needles):
+            continue
+        object_lower = object_text.lower()
+        if "/type /pattern" not in object_lower and "/subtype /form" not in object_lower:
+            continue
+
+        doc.update_stream(xref, b"q\nQ\n")
+        disabled += 1
+
+    return disabled
+
+
+def disable_private_watermark_streams(doc: fitz.Document) -> int:
+    """Disable PDFTron/Xodo watermark content streams without touching pages."""
+    disabled = 0
+    for xref in range(1, doc.xref_length()):
+        try:
+            object_text = doc.xref_object(xref, compressed=False)
+            stream = doc.xref_stream(xref)
+        except Exception:
+            continue
+
+        object_lower = object_text.lower()
+        if not stream or "/pdftron" not in object_lower or "/private /watermark" not in object_lower:
+            continue
+
+        doc.update_stream(xref, b"q\nQ\n")
+        disabled += 1
+    return disabled
+
+
+def remove_positioned_ad_text_streams(doc: fitz.Document) -> int:
+    """Remove the encoded bottom ad while preserving nearby page numbers.
+
+    The bottom ad is a separate BT/ET block at x=56.22, y=40 in the PDF
+    content stream. Removing only that block avoids painting over page numbers.
+    """
+    removed = 0
+    marker = b"BT\n1 0 0 1 56.22 40 Tm\n"
+
+    for xref in range(1, doc.xref_length()):
+        try:
+            stream = doc.xref_stream(xref)
+        except Exception:
+            continue
+        if not stream or marker not in stream:
+            continue
+
+        start = stream.find(marker)
+        end = stream.find(b"ET\n", start)
+        if end < 0:
+            continue
+        end += len(b"ET\n")
+        doc.update_stream(xref, stream[:start] + stream[end:])
+        removed += 1
+
+    return removed
+
+
 def mask_remaining_text_matches(page: fitz.Page, target_texts: list[str]) -> int:
     matches = 0
 
@@ -123,6 +213,9 @@ def remove_pdf_ads_and_watermark(
 ) -> tuple[int, int]:
     doc = fitz.open(input_pdf)
     total_matches = replace_exact_text_in_streams(doc, target_texts)
+    pattern_matches = disable_watermark_patterns(doc, ["@Yctbooks", "VikasNCERT"])
+    private_watermark_matches = disable_private_watermark_streams(doc)
+    positioned_ad_matches = remove_positioned_ad_text_streams(doc)
 
     for page in doc:
         total_matches += delete_matching_links(page, target_uris)
@@ -132,13 +225,17 @@ def remove_pdf_ads_and_watermark(
     doc.save(output_pdf, garbage=4, deflate=True)
     page_count = doc.page_count
     doc.close()
-    return page_count, total_matches
+    return (
+        page_count,
+        total_matches + pattern_matches + private_watermark_matches + positioned_ad_matches,
+    )
 
 
 def main() -> None:
-    pdf_files = iter_pdf_files(INPUT_FOLDER)
+    input_folder = find_input_folder()
+    pdf_files = iter_pdf_files(input_folder)
     if not pdf_files:
-        print(f"No PDF files found in: {INPUT_FOLDER}")
+        print(f"No PDF files found in: {input_folder}")
         sys.exit(1)
 
     processed = 0
